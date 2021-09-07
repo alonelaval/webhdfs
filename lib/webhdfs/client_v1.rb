@@ -2,6 +2,7 @@ require 'net/http'
 require 'uri'
 require 'json'
 require 'addressable/uri'
+require "base64"
 
 require_relative 'exceptions'
 
@@ -29,6 +30,8 @@ module WebHDFS
     attr_accessor :kerberos, :kerberos_keytab
     attr_accessor :http_headers
     attr_accessor :kerberos_delegation_token
+    attr_accessor :basic_user
+    attr_accessor :basic_pwd
 
     SSL_VERIFY_MODES = [:none, :peer]
     def ssl_verify_mode=(mode)
@@ -38,9 +41,11 @@ module WebHDFS
       @ssl_verify_mode = mode
     end
 
-    def initialize(host='localhost', port=50070, username=nil, doas=nil, proxy_address=nil, proxy_port=nil, http_headers={}, renew_kerberos_delegation_token_time_hour=nil)
+    def initialize(host='localhost', port=50070, basic_user=nil, basic_pwd=nil, username=nil, doas=nil, proxy_address=nil, proxy_port=nil, http_headers={}, renew_kerberos_delegation_token_time_hour=nil)
       @host = host
       @port = port
+      @basic_user = basic_user
+      @basic_pwd = basic_pwd
       @username = username
       @doas = doas
       @proxy_address = proxy_address
@@ -48,6 +53,7 @@ module WebHDFS
       @retry_known_errors = false
       @retry_times = 1
       @retry_interval = 1
+      
 
       @httpfs_mode = false
 
@@ -335,6 +341,7 @@ module WebHDFS
     # RumtimeException              500 Internal Server Error
     def request(host, port, method, path, op=nil, params={}, payload=nil, header=nil, retries=0)
       conn = Net::HTTP.new(host, port, @proxy_address, @proxy_port)
+      conn.
       conn.proxy_user = @proxy_user if @proxy_user
       conn.proxy_pass = @proxy_pass if @proxy_pass
       conn.open_timeout = @open_timeout if @open_timeout
@@ -386,6 +393,10 @@ module WebHDFS
       if !payload.nil? and payload.respond_to? :read and payload.respond_to? :size
         req = Net::HTTPGenericRequest.new(method,(payload ? true : false),true,request_path,header)
         raise WebHDFS::ClientError, 'Error accepting given IO resource as data payload, Not valid in methods other than PUT and POST' unless (method == 'PUT' or method == 'POST')
+        # add by huawei
+        if @basic_user  and @basic_pwd
+          req.basic_auth(@basic_user, @basic_pwd)
+        end
 
         req.body_stream = payload
         req.content_length = payload.size
@@ -396,6 +407,10 @@ module WebHDFS
         end
       else
         begin
+          if @basic_user  and @basic_pwd
+            b64User = "#{@basic_user}:#{basic_pwd}"
+            header['Authorization'] = "Basic #{Base64.strict_encode64(b64User)}"
+          end
           res = conn.send_request(method, request_path, payload, header)
         rescue => e
           raise WebHDFS::ServerError, "Failed to connect to host #{host}:#{port}, #{e.message}"
