@@ -40,7 +40,7 @@ module WebHDFS
       @ssl_verify_mode = mode
     end
 
-    def initialize(host='localhost', port=50070, basic_user=nil, basic_pwd=nil, username=nil, doas=nil, proxy_address=nil, proxy_port=nil, http_headers={}, renew_kerberos_delegation_token_time_hour=nil)
+    def initialize(host='localhost',port=50070, username=nil, doas=nil, proxy_address=nil, proxy_port=nil, http_headers={}, renew_kerberos_delegation_token_time_hour=nil, basic_user=nil, basic_pwd=nil)
       @host = host
       @port = port
       @basic_user = basic_user
